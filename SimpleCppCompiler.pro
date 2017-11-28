@@ -32,7 +32,9 @@ SOURCES += \
     declaredvariable.cpp \
     error.cpp \
     token.cpp \
-    parser.cpp
+    parser.cpp \
+    declaredfunction.cpp \
+    enummath.cpp
 
 HEADERS += \
         mainwindow.h \
@@ -42,7 +44,9 @@ HEADERS += \
     declaredvariable.h \
     error.h \
     token.h \
-    parser.h
+    parser.h \
+    declaredfunction.h \
+    enummath.h
 
 FORMS += \
         mainwindow.ui

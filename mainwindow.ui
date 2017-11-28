@@ -100,6 +100,13 @@
       <property name="lineWrapMode">
        <enum>QPlainTextEdit::NoWrap</enum>
       </property>
+      <property name="plainText">
+       <string>#include&lt;a&gt;
+int main()
+{
+}
+</string>
+      </property>
      </widget>
     </item>
     <item row="3" column="7" alignment="Qt::AlignHCenter|Qt::AlignVCenter">

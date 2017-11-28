@@ -122,9 +122,9 @@ void Token::createKeyWord(QString n)
     type = TokenType::Keyword;
     if(name=="void")
         value = ValueType::Void;
-    else if(name=="if" || name=="while" || name=="bool")
+    else if(name=="bool")
         value = ValueType::Boolean;
-    else if(name=="switch" || name=="case" || name=="int")
+    else if(name=="int")
         value = ValueType::Interger;
     else if(name=="float")
         value = ValueType::Float;
@@ -170,10 +170,8 @@ void Token::createSymbol(QString n)
     type = TokenType::Symbol;
     if(name=="!" || name=="||" || name=="&&" || name=="<" || name==">" || name=="=" || name=="<=" || name==">=" || name=="==" || name=="!=")
         value = ValueType::Boolean;
-    else if(name=="%" || name=="%=" || name=="++" || name=="--")
+    else if(name=="%" || name=="%=" || name=="++" || name=="--" || name=="+" || name=="-" || name=="*" || name=="/" || name=="+=" || name=="-=" || name=="*=" || name=="/=")
         value = ValueType::Interger;
-    else if(name=="+" || name=="-" || name=="*" || name=="/" || name=="+=" || name=="-=" || name=="*=" || name=="/=")
-        value = ValueType::Double;
     else
         value=ValueType::Nan;
 }

@@ -1,5 +1,7 @@
 #include "error.h"
 
+const QStringList Error::errors({"Missing ", "Extra token ", "Wrong header ", "Invalid ", "Cannot assign to a const ", " is not declared" , " is not a boolean", " is not an integer", " is not a float", " is not a double"});
+
 qint32 Error::getLine() const
 {
     return line;
@@ -20,9 +22,12 @@ void Error::setColumn(const qint32 &value)
     column = value;
 }
 
-Error::Error(QString n, qint32 l, qint32 c)
+Error::Error(qint32 i, QString n, qint32 l, qint32 c)
 {
-    name = n;
+    if(i < 5)
+        name = QString(errors[i]).append(n);
+    else
+        name = QString(n).append(errors[i]);
     line = l;
     column = c;
 }

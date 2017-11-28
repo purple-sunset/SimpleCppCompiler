@@ -6,6 +6,7 @@
 #include "parser.h"
 #include "codeeditor.h"
 #include "token.h"
+#include "enummath.h"
 
 namespace Ui {
 class MainWindow;
