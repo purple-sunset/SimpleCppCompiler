@@ -70,12 +70,15 @@ void MainWindow::on_btnParse_clicked()
 
 void MainWindow::on_resultList_itemClicked(QListWidgetItem)
 {
-    int index = ui->resultList->currentRow();
-    Error e = p->getErrors()->at(index);
-    ui->codeTextEdit->setFocus();
-    QTextCursor curs = ui->codeTextEdit->textCursor(); //copies current cursor
-    curs.movePosition(QTextCursor::Start);
-    curs.movePosition(QTextCursor::Down, QTextCursor::MoveAnchor, e.getLine());
-    curs.movePosition(QTextCursor::Right, QTextCursor::MoveAnchor, e.getColumn());
-    ui->codeTextEdit->setTextCursor(curs);
+    if(ui->resultList->currentItem()->text() != "No error")
+    {
+        int index = ui->resultList->currentRow();
+        Error e = p->getErrors()->at(index);
+        ui->codeTextEdit->setFocus();
+        QTextCursor curs = ui->codeTextEdit->textCursor(); //copies current cursor
+        curs.movePosition(QTextCursor::Start);
+        curs.movePosition(QTextCursor::Down, QTextCursor::MoveAnchor, e.getLine());
+        curs.movePosition(QTextCursor::Right, QTextCursor::MoveAnchor, e.getColumn());
+        ui->codeTextEdit->setTextCursor(curs);
+    }
 }

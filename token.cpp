@@ -1,6 +1,6 @@
 #include "token.h"
 
-const QStringList Token::keyWords({"include", "using", "namespace", "case", "switch", "if", "else", "for", "while", "do", "char", "bool", "int", "void", "float", "double"});
+const QStringList Token::keyWords({"include", "return", "using", "namespace", "case", "switch", "if", "else", "for", "while", "do", "char", "bool", "int", "void", "float", "double", "true", "false"});
 const QStringList Token::symbols({"#", "+", "-", "*", "/", "%", "<", ">", "=", "!", "&", "|", "(", ")", "{", "}",  "[", "]", "\"", "?", ".", ",", ":", ";"});
 const QStringList Token::tokenType({"Space", "Keyword", "Symbol", "Literal", "Variable", "Eol"});
 const QStringList Token::valueType({"Nan", "Void", "Boolean", "Interger", "Float", "Double"});
@@ -120,7 +120,12 @@ void Token::createKeyWord(QString n)
 {
     name = n;
     type = TokenType::Keyword;
-    if(name=="void")
+    if(name=="true" || name=="false")
+    {
+        type = TokenType::Literal;
+        value = ValueType::Boolean;
+    }
+    else if(name=="void")
         value = ValueType::Void;
     else if(name=="bool")
         value = ValueType::Boolean;
@@ -172,6 +177,8 @@ void Token::createSymbol(QString n)
         value = ValueType::Boolean;
     else if(name=="%" || name=="%=" || name=="++" || name=="--" || name=="+" || name=="-" || name=="*" || name=="/" || name=="+=" || name=="-=" || name=="*=" || name=="/=")
         value = ValueType::Interger;
+    else if(name=="(" || name==")")
+        value = ValueType::Void;
     else
         value=ValueType::Nan;
 }

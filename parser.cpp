@@ -41,6 +41,7 @@ Parser::Parser()
     stack = new QStack<QString>();
     isInFunction = false;
     funcValue = ValueType::Nan;
+    isReturned = false;
 }
 
 Parser::~Parser()
@@ -49,7 +50,6 @@ Parser::~Parser()
     delete declaredVariables;
     delete declaredFunctions;
     delete errors;
-    delete currentToken;
     delete stack;
 }
 
@@ -182,22 +182,14 @@ void Parser::parseToken(QString text)
 
 void Parser::check()
 {
+    getTokenWithSpace();
     while (currentIndex < tokens->size() - 1)
     {
-        getTokenWithSpace();
-
         if(!isInFunction)
         {
             //check for #include
             if(checkInclude())
             {
-                if(!currentToken->checkType(TokenType::Eol))
-                    getTokenWithSpace();
-                    while(!currentToken->checkType(TokenType::Eol))
-                    {
-                        errors->append(Error(1, currentToken->getName(), currentToken->getLine(), currentToken->getColumn()));
-                        getTokenWithSpace();
-                    }
                 continue;
             }
         }
@@ -206,8 +198,14 @@ void Parser::check()
         if(checkDeclareFuncStat())
         {
             isInFunction = true;
-            if(!checkBlockStat(true))
-                errors->append(Error(3, "block statement", currentToken->getLine(), currentToken->getColumn()));
+            if(checkFuncBlock())
+            {
+                if(funcValue != ValueType::Void && !isReturned)
+                    errors->append(Error(0, "return statement", currentToken->getLine(), currentToken->getColumn()));
+            }
+            else
+                errors->append(Error(0, "\"{\"", currentToken->getLine(), currentToken->getColumn()));
+            continue;
         }
 
         //check for empty line
@@ -239,87 +237,102 @@ bool Parser::checkInclude()
         if(currentToken->checkName("include"))
         {
             getTokenWithSpace();
-            if(currentToken->checkName("<"))
-            {
-                stack->push("<");
-                getTokenWithSpace();
-                if(currentToken->checkType(TokenType::Variable))
-                {
-                    getTokenWithSpace();
-                    while(!currentToken->checkName(">"))
-                    {
-                        if(currentToken->checkType(TokenType::Eol) || currentIndex == tokens->size() - 1)
-                        {
-                            stack->pop();
-                            errors->append(Error(0, "\">\"", currentToken->getLine(), currentToken->getColumn()));
-                            return true;
-                        }
-                        errors->append(Error(1, currentToken->getName(), currentToken->getLine(), currentToken->getColumn()));
-                        getTokenWithSpace();
-                    }
-                    stack->pop();
-                }
-                else
-                    errors->append(Error(0, "header name", currentToken->getLine(), currentToken->getColumn()));
-            }
-            else if(currentToken->checkName("\""))
-            {
-                stack->push("\"");
-                getTokenWithSpace();
-                if(currentToken->checkType(TokenType::Variable))
-                {
-                    getTokenWithSpace();
-                    if(currentToken->checkName("."))
-                    {
-                        getTokenWithSpace();
-                        if(currentToken->checkName("h"))
-                        {
-                            getTokenWithSpace();
-                            while(!currentToken->checkName("\""))
-                            {
-                                if(currentToken->checkType(TokenType::Eol) || currentIndex == tokens->size() - 1)
-                                {
-                                    stack->pop();
-                                    errors->append(Error(0, "\"\"\"", currentToken->getLine(), currentToken->getColumn()));
-                                    return true;
-                                }
-                                errors->append(Error(1, currentToken->getName(), currentToken->getLine(), currentToken->getColumn()));
-                                getTokenWithSpace();
-                            }
-                            stack->pop();
-                        }
-                        else
-                            errors->append(Error(0, "header name", currentToken->getLine(), currentToken->getColumn()));
-                    }
-                    else
-                        errors->append(Error(0, "header name", currentToken->getLine(), currentToken->getColumn()));
-                }
-                else
-                    errors->append(Error(0, "header name", currentToken->getLine(), currentToken->getColumn()));
-            }
-            else
-                errors->append(Error(0, "\"<\" or \"\"\"", currentToken->getLine(), currentToken->getColumn()));
         }
         else
             errors->append(Error(0, "\"include\"", currentToken->getLine(), currentToken->getColumn()));
+
+        if(currentToken->checkName("<"))
+        {
+            getTokenWithSpace();
+            if(currentToken->checkType(TokenType::Variable))
+            {
+                getTokenWithSpace();
+            }
+            else
+                errors->append(Error(0, "header name", currentToken->getLine(), currentToken->getColumn()));
+
+            if(currentToken->checkName(">"))
+            {
+                getTokenWithSpace();
+            }
+            else
+                errors->append(Error(0, "\">\"", currentToken->getLine(), currentToken->getColumn()));
+        }
+        else if(currentToken->checkName("\""))
+        {
+            getTokenWithSpace();
+            if(currentToken->checkType(TokenType::Variable))
+            {
+                getTokenWithSpace();
+                if(currentToken->checkName("."))
+                {
+                    getTokenWithSpace();
+                    if(currentToken->checkName("h"))
+                    {
+                        getTokenWithSpace();
+                    }
+                    else
+                        errors->append(Error(2, "name", currentToken->getLine(), currentToken->getColumn()));
+                }
+                else
+                    errors->append(Error(2, "name", currentToken->getLine(), currentToken->getColumn()));
+            }
+            else
+                errors->append(Error(0, "header name", currentToken->getLine(), currentToken->getColumn()));
+
+            if(currentToken->checkName("\""))
+            {
+                getTokenWithSpace();
+            }
+            else
+                errors->append(Error(0, "\"\"\"", currentToken->getLine(), currentToken->getColumn()));
+        }
+        else
+            errors->append(Error(0, "\"<\" or \"\"\"", currentToken->getLine(), currentToken->getColumn()));
+
+        checkEol(false);
         return true;
     }
     return false;
 }
 
-bool Parser::checkEol()
+bool Parser::checkEol(bool b)
 {
-    if(currentToken->checkName(";"))
+    if(b)
     {
-        getTokenWithSpace();
+        bool hasE = false;
         while(!currentToken->checkType(TokenType::Eol))
         {
-            errors->append(Error(1, currentToken->getName(), currentToken->getLine(), currentToken->getColumn()));
+            if(currentToken->checkName(";"))
+            {
+                hasE = true;
+                getTokenWithSpace();
+                break;
+            }
+            errors->append(Error(1, "\"" + currentToken->getName() + "\"", currentToken->getLine(), currentToken->getColumn()));
+            getTokenWithSpace();
         }
 
+        while (!currentToken->checkType(TokenType::Eol))
+        {
+            errors->append(Error(1, "\"" + currentToken->getName() + "\"", currentToken->getLine(), currentToken->getColumn()));
+            getTokenWithSpace();
+        }
+
+        if(!hasE)
+            errors->append(Error(0, "\";\"", currentToken->getLine(), currentToken->getColumn()));
         return true;
     }
-    errors->append(Error(0, "\";\"", currentToken->getLine(), currentToken->getColumn()));
+    else
+    {
+        while(!currentToken->checkType(TokenType::Eol))
+        {
+            errors->append(Error(1, "\"" + currentToken->getName() + "\"", currentToken->getLine(), currentToken->getColumn()));
+            getTokenWithSpace();
+        }
+        getTokenWithSpace();
+        return true;
+    }
     return false;
 
 }
@@ -329,51 +342,127 @@ bool Parser::checkDeclareFuncStat()
     if(currentToken->checkType(TokenType::Keyword) && !currentToken->checkValue(ValueType::Nan))
     {
         ValueType v = currentToken->getValue();
+
         getTokenWithSpace();
         if(currentToken->checkType(TokenType::Variable))
         {
-            QString *s = new QString(currentToken->getName());
             getTokenWithSpace();
-            if(currentToken->checkName("("))
-            {
-                getTokenWithSpace();
-                if(currentToken->checkName(")"))
-                {
-                    getTokenWithSpace();
-                    while(!currentToken->checkType(TokenType::Eol))
-                    {
-                        errors->append(Error(1, currentToken->getName(), currentToken->getLine(), currentToken->getColumn()));
-                        getTokenWithSpace();
-                    }
-                    declaredFunctions->append(DeclaredFunction(*s, v));
-                    funcValue = v;
-                }
-                else
-                    errors->append(Error(0, "\")\"", currentToken->getLine(), currentToken->getColumn()));
-            }
-            else
-                errors->append(Error(0, "\"(\"", currentToken->getLine(), currentToken->getColumn()));
+            declaredFunctions->append(DeclaredFunction(currentToken->getName(), v));
+            isInFunction = true;
+            funcValue = v;
         }
+
         else
             errors->append(Error(0, "function name", currentToken->getLine(), currentToken->getColumn()));
+
+        if(currentToken->checkName("("))
+            getTokenWithSpace();
+        else
+            errors->append(Error(0, "\"(\"", currentToken->getLine(), currentToken->getColumn()));
+
+        if(currentToken->checkType(TokenType::Keyword) && !currentToken->checkValue(ValueType::Nan))
+        {
+            ValueType v = currentToken->getValue();
+            getTokenWithSpace();
+            if(currentToken->checkType(TokenType::Variable))
+            {
+                checkVariable(currentToken);
+                if(!currentToken->checkValue(ValueType::Void) && currentToken->checkValue(v))
+                        errors->append(Error(6, currentToken->getName(), currentToken->getLine(), currentToken->getColumn()));
+                else
+                {
+                    declaredVariables->append(DeclaredVariable(currentToken->getName(), v, true));
+                    checkVariable(currentToken);
+                }
+
+
+                while (getTokenWithSpace() && (currentToken->checkName(",")))
+                {
+                    getTokenWithSpace();
+                    if(currentToken->checkType(TokenType::Variable))
+                    {
+                        checkVariable(currentToken);
+                        if(!currentToken->checkValue(ValueType::Void) && currentToken->checkValue(v))
+                                errors->append(Error(6, currentToken->getName(), currentToken->getLine(), currentToken->getColumn()));
+                        else
+                        {
+                            declaredVariables->append(DeclaredVariable(currentToken->getName(), v, true));
+                            checkVariable(currentToken);
+                        }
+                    }
+                    else
+                        break;
+                }
+            }
+        }
+        else if(currentToken->checkName(")"))
+            getTokenWithSpace();
+        else
+            errors->append(Error(0, "\")\"", currentToken->getLine(), currentToken->getColumn()));
+
+        checkEol(false);
         return true;
     }
     return false;
 }
 
+
 ValueType Parser::checkDeclareVarStat()
 {
     bool b = false;
+    if(currentToken->checkName("const"))
+    {
+        b=true;
+        getTokenWithSpace();
+    }
     if(currentToken->checkType(TokenType::Keyword) && !currentToken->checkValue(ValueType::Nan))
     {
         ValueType v = currentToken->getValue();
         getTokenWithSpace();
         if(currentToken->checkType(TokenType::Variable))
         {
-            QString *s = new QString(currentToken->getName());
+            checkVariable(currentToken);
+            if(!currentToken->checkValue(ValueType::Void) && currentToken->checkValue(v))
+                    errors->append(Error(6, currentToken->getName(), currentToken->getLine(), currentToken->getColumn()));
+            else
+            {
+                declaredVariables->append(DeclaredVariable(currentToken->getName(), v, b));
+                checkVariable(currentToken);
+            }
+
             getTokenWithSpace();
-            checkEol();
-            declaredVariables->append(DeclaredVariable(*s, v, b));
+            if(currentToken->checkName("="))
+            {
+                getTokenWithSpace();
+                if(!checkExpression(v))
+                    errors->append(Error(static_cast<qint32>(v)+5, "Expression", currentToken->getLine(), currentToken->getColumn()));
+
+
+            }
+            else
+            {
+                while ((currentToken->checkName(",")))
+                {
+                    getTokenWithSpace();
+                    if(currentToken->checkType(TokenType::Variable))
+                    {
+                        checkVariable(currentToken);
+                        if(!currentToken->checkValue(ValueType::Void) && currentToken->checkValue(v))
+                            errors->append(Error(6, currentToken->getName(), currentToken->getLine(), currentToken->getColumn()));
+                        else
+                        {
+                            declaredVariables->append(DeclaredVariable(currentToken->getName(), v, b));
+                            checkVariable(currentToken);
+                        }
+                    }
+                    else
+                        break;
+                    getTokenWithSpace();
+                }
+            }
+
+
+            checkEol(true);
             return v;
         }
         else
@@ -393,21 +482,24 @@ bool Parser::checkAssignStat(bool b)
         if(currentToken->checkName("="))
         {
             if(checkVariable(t))
-                errors->append(Error(4, t->getName(), t->getLine(), t->getColumn()));
-            if(t->checkValue(ValueType::Nan))
-                errors->append(Error(5, t->getName(), t->getLine(), t->getColumn()));
+                errors->append(Error(4, "\"" + t->getName() + "\"", t->getLine(), t->getColumn()));
+            if(t->checkValue(ValueType::Void))
+                errors->append(Error(5, "\"" +  t->getName() + "\"", t->getLine(), t->getColumn()));
             getTokenWithSpace();
-            if(checkExpression(t->getValue()))
-                errors->append(Error(static_cast<qint32>(t->getValue()), currentToken->getName(), currentToken->getLine(), currentToken->getColumn()));
+            if(!checkExpression(t->getValue()))
+                errors->append(Error(static_cast<qint32>(t->getValue())+5, "Expression", currentToken->getLine(), currentToken->getColumn()));
             if(b)
             {
-                getTokenWithSpace();
-                checkEol();
+                checkEol(true);
             }
             return true;
         }
         else
-            currentIndex = i;
+        {
+            currentIndex = i-1;
+            getTokenWithoutSpace();
+        }
+
         return false;
     }
     return false;
@@ -415,79 +507,67 @@ bool Parser::checkAssignStat(bool b)
 
 bool Parser::checkExpression(ValueType v)
 {
-    ValueType minV = ValueType::Nan;
-    ValueType maxV = ValueType::Nan;
-    QStack<Token> *s = new QStack<Token>();
+    if(currentToken->checkType(TokenType::Variable))
+        checkVariable(currentToken);
+    ValueType minV = currentToken->getValue();
+    ValueType maxV = currentToken->getValue();
+    QStack<Token> *s1 = new QStack<Token>();
+    QStack<Token> *s2 = new QStack<Token>();
     bool isValid = true;
-    while(!currentToken->checkType(TokenType::Eol))
+    while(!currentToken->checkType(TokenType::Eol) && !currentToken->checkType(TokenType::Keyword) && !currentToken->checkValue(ValueType::Nan))
     {
         if(currentToken->checkName("("))
         {
-            s->push(*currentToken);
+            s1->push(*currentToken);
+        }
+        else if(currentToken->checkName(")"))
+        {
+            if(s1->size()>0)
+            {
+                s1->pop();
+            }
+            else
+                errors->append(Error(1,"\")\"", currentToken->getLine(), currentToken->getColumn()));
         }
         else if(currentToken->checkType(TokenType::Variable))
         {
-            if(checkVariable(currentToken))
-                errors->append(Error(4, currentToken->getName(), currentToken->getLine(), currentToken->getColumn()));
-            if(s->size()>0)
-            {
-                Token t = s->pop();
-                if(t.checkName("("))
-                {
-                    s->push(t);
-                    s->push(*currentToken);
-                    minV = EnumMath::Min(minV, currentToken->getValue());
-                    maxV = EnumMath::Min(minV, currentToken->getValue());
-                }
-                else
-                {
-                    isValid = false;
-                    errors->append(Error(3,"expression", currentToken->getLine(), currentToken->getColumn()));
-                    break;
-                }
-            }
+            checkVariable(currentToken);
+            if(currentToken->checkValue(ValueType::Void))
+                errors->append(Error(5, currentToken->getName(), currentToken->getLine(), currentToken->getColumn()));
+            s2->push(*currentToken);
+            minV = EnumMath::Min(minV, currentToken->getValue());
+            maxV = EnumMath::Max(maxV, currentToken->getValue());
 
         }
         else if(currentToken->checkType(TokenType::Literal))
         {
-            if(s->size()>0)
-            {
-                Token t = s->pop();
-                if(t.checkName("("))
-                {
-                    s->push(t);
-                    s->push(*currentToken);
-                    minV = EnumMath::Min(minV, currentToken->getValue());
-                    maxV = EnumMath::Min(minV, currentToken->getValue());
-                }
-                else
-                {
-                    isValid = false;
-                    errors->append(Error(3,"expression", currentToken->getLine(), currentToken->getColumn()));
-                    break;
-                }
-            }
+            s2->push(*currentToken);
+            minV = EnumMath::Min(minV, currentToken->getValue());
+            maxV = EnumMath::Max(maxV, currentToken->getValue());
         }
         else if (   currentToken->checkName("+") || currentToken->checkName("-") || currentToken->checkName("*") || currentToken->checkName("/") || currentToken->checkName("%")
-                 || currentToken->checkName("<") || currentToken->checkName(">") || currentToken->checkName("==") || currentToken->checkName("!=") || currentToken->checkName("<=")
-                 || currentToken->checkName(">=") || currentToken->checkName("||") || currentToken->checkName("&&"))
+                 || currentToken->checkName("++") || currentToken->checkName("--"))
         {
-            if(s->size()>0)
+            if(s2->size()>0)
             {
-                Token t = s->pop();
-                if(t.checkType(TokenType::Literal) || t.checkType(TokenType::Variable))
-                {
-                    minV = EnumMath::Min(minV, currentToken->getValue());
-                    maxV = EnumMath::Min(minV, currentToken->getValue());
-                }
-                else
-                {
-                    isValid = false;
-                    errors->append(Error(3,"expression", currentToken->getLine(), currentToken->getColumn()));
-                    break;
-                }
-
+                Token t = s2->pop();
+                minV = EnumMath::Min(minV, currentToken->getValue());
+                maxV = EnumMath::Max(maxV, currentToken->getValue());
             }
+            else
+                errors->append(Error(3,"expression", currentToken->getLine(), currentToken->getColumn()));
+        }
+        else if (currentToken->checkName("<") || currentToken->checkName(">") || currentToken->checkName("==") || currentToken->checkName("!=") || currentToken->checkName("<=")
+                || currentToken->checkName(">=") || currentToken->checkName("||") || currentToken->checkName("&&"))
+        {
+            if(s2->size()>0)
+            {
+                Token t = s2->pop();
+                minV = ValueType::Boolean;
+                maxV = ValueType::Boolean;
+            }
+            else
+                errors->append(Error(3,"expression", currentToken->getLine(), currentToken->getColumn()));
         }
         else
         {
@@ -495,14 +575,36 @@ bool Parser::checkExpression(ValueType v)
             errors->append(Error(3,"expression", currentToken->getLine(), currentToken->getColumn()));
             break;
         }
+        if(!getTokenWithSpace())
+            break;
+    }
+    while(s1->size()>0)
+    {
+        Token t=s1->pop();
+        errors->append(Error(1,"\"(\"", t.getLine(), t.getColumn()));
     }
     if(isValid)
     {
-        if(v == ValueType::Boolean)
-            return (minV == ValueType::Boolean) && (maxV == ValueType::Boolean);
+        if(v == ValueType::Void)
+            return ((minV == ValueType::Boolean) && (maxV >= ValueType::Boolean)) || ((minV > ValueType::Boolean) && (maxV >= v));
+        else if(v == ValueType::Boolean)
+            return (minV == ValueType::Boolean) && (maxV >= ValueType::Boolean);
         else
-            return (minV > ValueType::Boolean) && (minV <= v) && (maxV >= v);
+            return (minV > ValueType::Boolean) && (minV <= v) && (maxV <= v);
 
+    }
+    return false;
+}
+
+bool Parser::checkExpressionStat(bool b, ValueType v)
+{
+    if(checkExpression(v))
+    {
+        if(b)
+        {
+            checkEol(true);
+        }
+        return true;
     }
     return false;
 }
@@ -512,25 +614,87 @@ bool Parser::checkIf()
     if(currentToken->checkName("if"))
     {
         getTokenWithSpace();
-        if(checkExpression(ValueType::Boolean))
+        currentToken->setValue(ValueType::Nan);
+        qint32 i = currentIndex;
+        Token *t;
+        bool hasE = false;
+        while(!currentToken->checkType(TokenType::Eol))
+        {
+            if(currentToken->checkName(")"))
+            {
+                hasE = true;
+                t=currentToken;
+            }
+            if(!getTokenWithSpace())
+                break;
+        }
+        if(hasE)
+            t->setValue(ValueType::Nan);
+        else
+            errors->append(Error(0, "\")\"", currentToken->getLine(), currentToken->getColumn()));
+
+        currentIndex = i;
+        currentToken = &(*tokens)[currentIndex];
+
+        if(currentToken->checkName("("))
         {
             getTokenWithSpace();
-            if(!checkEmptyLine())
-                while(!currentToken->checkType(TokenType::Eol))
-                {
-                    errors->append(Error(1, currentToken->getName(), currentToken->getLine(), currentToken->getColumn()));
-                    getTokenWithSpace();
-                }
-            if(!checkBlockStat(false))
-                errors->append(Error(3, "block statement", currentToken->getLine(), currentToken->getColumn()));
-            checkElse();
+            if(!checkExpression(ValueType::Boolean))
+                errors->append(Error(3,"condition", currentToken->getLine(), currentToken->getColumn()));
+            if(!currentToken->checkName(")"))
+                errors->append(Error(0, ")",currentToken->getLine(), currentToken->getColumn()));
+            getTokenWithSpace();
         }
+
+        else if(currentToken->checkType(TokenType::Variable) || currentToken->checkType(TokenType::Literal))
+        {
+            qint32 i2 = currentIndex;
+            getTokenWithSpace();
+            if(checkEmptyLine())
+            {
+                currentIndex = i2;
+                currentToken = &(*tokens)[currentIndex];
+                if(currentToken->checkValue(ValueType::Boolean))
+                {
+                    getTokenWithSpace();
+                    checkEol(false);
+                }
+                else
+                    errors->append(Error(7, currentToken->getName(), currentToken->getLine(), currentToken->getColumn()));
+            }
+            else
+            {
+                currentIndex = i2;
+                currentToken = &(*tokens)[currentIndex];
+                errors->append(Error(0, "\"(\"", currentToken->getLine(), currentToken->getColumn()));
+                if(!checkExpression(ValueType::Boolean))
+                    errors->append(Error(3,"condition", currentToken->getLine(), currentToken->getColumn()));
+            }
+
+        }
+
         else
         {
-            errors->append(Error(3,"condition", currentToken->getLine(), currentToken->getColumn()));
+            errors->append(Error(0, "\"(\"", currentToken->getLine(), currentToken->getColumn()));
+            getTokenWithSpace();
+            if(!checkExpression(ValueType::Boolean))
+                errors->append(Error(3,"condition", currentToken->getLine(), currentToken->getColumn()));
+
         }
+
+
+        checkEol(false);
+        while(checkEmptyLine())
+            getTokenWithSpace();
+        if(!checkBlockStat())
+            errors->append(Error(3, "block statement",currentToken->getLine(), currentToken->getColumn()));
+
+        while(checkEmptyLine() && currentIndex<tokens->size()-1)
+            getTokenWithSpace();
+        checkElse();
         return true;
     }
+
     return false;
 }
 
@@ -539,16 +703,18 @@ bool Parser::checkElse()
     if(currentToken->checkName("else"))
     {
         getTokenWithSpace();
+
+        while(checkEmptyLine())
+            getTokenWithSpace();
         if(currentToken->checkName("if"))
             checkIf();
-        else if(!checkEmptyLine())
-            while(!currentToken->checkType(TokenType::Eol))
-            {
-                errors->append(Error(1, currentToken->getName(), currentToken->getLine(), currentToken->getColumn()));
+        else
+        {
+            while(checkEmptyLine())
                 getTokenWithSpace();
-            }
-        if(!checkBlockStat(false))
-            errors->append(Error(3, "block statement", currentToken->getLine(), currentToken->getColumn()));
+            if(!checkBlockStat())
+                errors->append(Error(3, "block statement",currentToken->getLine(), currentToken->getColumn()));
+        }
         return true;
     }
     return false;
@@ -559,56 +725,87 @@ bool Parser::checkFor()
     if(currentToken->checkName("for"))
     {
         getTokenWithSpace();
+        currentToken->setValue(ValueType::Nan);
+        qint32 i = currentIndex;
+        Token *t;
+        bool hasE = false;
+        while(!currentToken->checkType(TokenType::Eol))
+        {
+            if(currentToken->checkName(")"))
+            {
+                hasE = true;
+                t=currentToken;
+            }
+            if(!getTokenWithSpace())
+                break;
+        }
+        if(hasE)
+            t->setValue(ValueType::Nan);
+        else
+            errors->append(Error(0, "\")\"", currentToken->getLine(), currentToken->getColumn()));
+
+        currentIndex = i;
+        currentToken = &(*tokens)[currentIndex];
+
         if(currentToken->checkName("("))
         {
             getTokenWithSpace();
             if(checkAssignStat(false))
             {
-                getTokenWithSpace();
+                //getTokenWithSpace();
                 if(currentToken->checkName(";"))
                 {
-                    if(checkExpression(ValueType::Boolean))
-                    {
-                        getTokenWithSpace();
-                        if(currentToken->checkName(";"))
-                        {
-                            if(checkAssignStat(false))
-                            {
-                                getTokenWithSpace();
-                                if(currentToken->checkName(")"))
-                                {
-                                    getTokenWithSpace();
-                                    if(!checkEmptyLine())
-                                        while(!currentToken->checkType(TokenType::Eol))
-                                        {
-                                            errors->append(Error(1, currentToken->getName(), currentToken->getLine(), currentToken->getColumn()));
-                                            getTokenWithSpace();
-                                        }
-                                    if(!checkBlockStat(false))
-                                        errors->append(Error(3, "block statement",currentToken->getLine(), currentToken->getColumn()));
-                                }
-                                else
-                                    errors->append(Error(0, ")",currentToken->getLine(), currentToken->getColumn()));
-                            }
-                            else
-                               errors->append(Error(0, "statement", currentToken->getLine(), currentToken->getColumn()));
-
-                        }
-                        else
-                            errors->append(Error(0, "\";\"", currentToken->getLine(), currentToken->getColumn()));
-                    }
-                    else
-                        errors->append(Error(0, "statement", currentToken->getLine(), currentToken->getColumn()));
+                    getTokenWithSpace();
                 }
                 else
                     errors->append(Error(0, "\";\"", currentToken->getLine(), currentToken->getColumn()));
             }
             else
-                errors->append(Error(0, "statement", currentToken->getLine(), currentToken->getColumn()));
+            {
+                errors->append(Error(3, "initialize statement", currentToken->getLine(), currentToken->getColumn()));
+            }
+
+            if(checkExpression(ValueType::Boolean))
+            {
+                //getTokenWithSpace();
+                if(currentToken->checkName(";"))
+                {
+                    getTokenWithSpace();
+                }
+                else
+                    errors->append(Error(0, "\";\"", currentToken->getLine(), currentToken->getColumn()));
+            }
+            else
+            {
+                errors->append(Error(3, "condition", currentToken->getLine(), currentToken->getColumn()));
+            }
+
+            if(checkExpressionStat(false, ValueType::Void) || checkExpression(ValueType::Void))
+            {
+                //getTokenWithSpace();
+                if(currentToken->checkName(")"))
+                {
+                    getTokenWithSpace();
+                }
+            }
+            else
+            {
+                getTokenWithSpace();
+                errors->append(Error(3, "afterthought", currentToken->getLine(), currentToken->getColumn()));
+            }
         }
         else
-            errors->append(Error(0, "(",currentToken->getLine(), currentToken->getColumn()));
+        {
+            errors->append(Error(0, "\"(\"", currentToken->getLine(), currentToken->getColumn()));
+        }
 
+        checkEol(false);
+        while(checkEmptyLine())
+            getTokenWithSpace();
+        if(!checkBlockStat())
+            errors->append(Error(3, "block statement",currentToken->getLine(), currentToken->getColumn()));
+        while(checkEmptyLine() && currentIndex<tokens->size()-1)
+            getTokenWithSpace();
         return true;
     }
     return false;
@@ -619,34 +816,83 @@ bool Parser::checkWhile()
     if(currentToken->checkName("while"))
     {
         getTokenWithSpace();
+        currentToken->setValue(ValueType::Nan);
+        qint32 i = currentIndex;
+        Token *t;
+        bool hasE = false;
+        while(!currentToken->checkType(TokenType::Eol))
+        {
+            if(currentToken->checkName(")"))
+            {
+                hasE = true;
+                t=currentToken;
+            }
+            if(!getTokenWithSpace())
+                break;
+        }
+        if(hasE)
+            t->setValue(ValueType::Nan);
+        else
+            errors->append(Error(0, "\")\"", currentToken->getLine(), currentToken->getColumn()));
+
+        currentIndex = i;
+        currentToken = &(*tokens)[currentIndex];
+
         if(currentToken->checkName("("))
         {
             getTokenWithSpace();
-            if(checkExpression(ValueType::Boolean))
+            if(!checkExpression(ValueType::Boolean))
+                errors->append(Error(3,"condition", currentToken->getLine(), currentToken->getColumn()));
+            if(!currentToken->checkName(")"))
+                errors->append(Error(0, ")",currentToken->getLine(), currentToken->getColumn()));
+            getTokenWithSpace();
+        }
+
+        else if(currentToken->checkType(TokenType::Variable) || currentToken->checkType(TokenType::Literal))
+        {
+            qint32 i2 = currentIndex;
+            getTokenWithSpace();
+            if(checkEmptyLine())
             {
-                getTokenWithSpace();
-                if(currentToken->checkName(")"))
+                currentIndex = i2;
+                currentToken = &(*tokens)[currentIndex];
+                if(currentToken->checkValue(ValueType::Boolean))
                 {
                     getTokenWithSpace();
-                    if(!checkEmptyLine())
-                        while(!currentToken->checkType(TokenType::Eol))
-                        {
-                            errors->append(Error(1, currentToken->getName(), currentToken->getLine(), currentToken->getColumn()));
-                            getTokenWithSpace();
-                        }
-                    if(!checkBlockStat(false))
-                        errors->append(Error(3, "block statement",currentToken->getLine(), currentToken->getColumn()));
+                    checkEol(false);
                 }
                 else
-                    errors->append(Error(0, ")",currentToken->getLine(), currentToken->getColumn()));
+                    errors->append(Error(7, currentToken->getName(), currentToken->getLine(), currentToken->getColumn()));
             }
             else
-                errors->append(Error(0, "condition", currentToken->getLine(), currentToken->getColumn()));
+            {
+                currentIndex = i2;
+                currentToken = &(*tokens)[currentIndex];
+                errors->append(Error(0, "\"(\"", currentToken->getLine(), currentToken->getColumn()));
+                if(!checkExpression(ValueType::Boolean))
+                    errors->append(Error(3,"condition", currentToken->getLine(), currentToken->getColumn()));
+            }
+
         }
+
         else
-            errors->append(Error(0, "(",currentToken->getLine(), currentToken->getColumn()));
+        {
+            errors->append(Error(0, "\"(\"", currentToken->getLine(), currentToken->getColumn()));
+            getTokenWithSpace();
+            if(!checkExpression(ValueType::Boolean))
+                errors->append(Error(3,"condition", currentToken->getLine(), currentToken->getColumn()));
+
+        }
+
+
+        checkEol(false);
+        while(checkEmptyLine())
+            getTokenWithSpace();
+        if(!checkBlockStat())
+            errors->append(Error(3, "block statement",currentToken->getLine(), currentToken->getColumn()));
         return true;
     }
+
     return false;
 }
 
@@ -655,42 +901,87 @@ bool Parser::checkDo()
     if(currentToken->checkName("do"))
     {
         getTokenWithSpace();
-        if(!checkEmptyLine())
-            while(!currentToken->checkType(TokenType::Eol))
-            {
-                errors->append(Error(1, currentToken->getName(), currentToken->getLine(), currentToken->getColumn()));
-                getTokenWithSpace();
-            }
-        if(!checkBlockStat(false))
+        checkEol(false);
+        while(checkEmptyLine())
+            getTokenWithSpace();
+        if(!checkBlockStat())
             errors->append(Error(3, "block statement",currentToken->getLine(), currentToken->getColumn()));
-        getTokenWithSpace();
+
+        while(checkEmptyLine() && currentIndex<tokens->size()-1)
+            getTokenWithSpace();
         if(currentToken->checkName("while"))
         {
             getTokenWithSpace();
+            currentToken->setValue(ValueType::Nan);
+            qint32 i = currentIndex;
+            Token *t;
+            bool hasE = false;
+            while(!currentToken->checkType(TokenType::Eol))
+            {
+                if(currentToken->checkName(")"))
+                {
+                    hasE = true;
+                    t=currentToken;
+                }
+                if(!getTokenWithSpace())
+                    break;
+            }
+            if(hasE)
+                t->setValue(ValueType::Nan);
+            else
+                errors->append(Error(0, "\")\"", currentToken->getLine(), currentToken->getColumn()));
+
+            currentIndex = i;
+            currentToken = &(*tokens)[currentIndex];
+
             if(currentToken->checkName("("))
             {
                 getTokenWithSpace();
-                if(checkExpression(ValueType::Boolean))
+                if(!checkExpression(ValueType::Boolean))
+                    errors->append(Error(3,"condition", currentToken->getLine(), currentToken->getColumn()));
+                if(!currentToken->checkName(")"))
+                    errors->append(Error(0, ")",currentToken->getLine(), currentToken->getColumn()));
+                getTokenWithSpace();
+            }
+
+            else if(currentToken->checkType(TokenType::Variable) || currentToken->checkType(TokenType::Literal))
+            {
+                qint32 i2 = currentIndex;
+                getTokenWithSpace();
+                if(checkEmptyLine())
                 {
-                    getTokenWithSpace();
-                    if(currentToken->checkName(")"))
+                    currentIndex = i2;
+                    currentToken = &(*tokens)[currentIndex];
+                    if(currentToken->checkValue(ValueType::Boolean))
                     {
                         getTokenWithSpace();
-                        if(!checkEmptyLine())
-                            while(!currentToken->checkType(TokenType::Eol))
-                            {
-                                errors->append(Error(1, currentToken->getName(), currentToken->getLine(), currentToken->getColumn()));
-                                getTokenWithSpace();
-                            }
+                        checkEol(false);
                     }
                     else
-                        errors->append(Error(0, ")",currentToken->getLine(), currentToken->getColumn()));
+                        errors->append(Error(7, currentToken->getName(), currentToken->getLine(), currentToken->getColumn()));
                 }
                 else
-                    errors->append(Error(0, "condition", currentToken->getLine(), currentToken->getColumn()));
+                {
+                    currentIndex = i2;
+                    currentToken = &(*tokens)[currentIndex];
+                    errors->append(Error(0, "\"(\"", currentToken->getLine(), currentToken->getColumn()));
+                    if(!checkExpression(ValueType::Boolean))
+                        errors->append(Error(3,"condition", currentToken->getLine(), currentToken->getColumn()));
+                }
+
             }
+
             else
-                errors->append(Error(0, "(",currentToken->getLine(), currentToken->getColumn()));
+            {
+                errors->append(Error(0, "\"(\"", currentToken->getLine(), currentToken->getColumn()));
+                getTokenWithSpace();
+                if(!checkExpression(ValueType::Boolean))
+                    errors->append(Error(3,"condition", currentToken->getLine(), currentToken->getColumn()));
+
+            }
+
+            //getTokenWithSpace();
+            checkEol(true);
         }
         else
             errors->append(Error(0, "while",currentToken->getLine(), currentToken->getColumn()));
@@ -707,13 +998,13 @@ bool Parser::checkReturn(ValueType v)
         if(v == ValueType::Void)
         {
             getTokenWithSpace();
-            checkEol();
+            checkEol(true);
         }
         else
         {
             if(checkExpression(v))
             {
-                checkEol();
+                checkEol(true);
             }
             else
                 errors->append(Error(3, "return", currentToken->getLine(), currentToken->getColumn()));
@@ -723,58 +1014,121 @@ bool Parser::checkReturn(ValueType v)
     return false;
 }
 
-bool Parser::checkBlockStat(bool isFunc)
+bool Parser::checkFuncBlock()
 {
-    if(currentToken->checkName("{"))
+    if(currentToken->checkName("{") && getTokenWithSpace())
     {
-        bool isH = false;
-        while(!currentToken->checkType(TokenType::Eol))
+        while(!currentToken->checkName("}"))
         {
-            getTokenWithSpace();
-            if(currentToken->checkName("}"))
+            if(currentToken->checkType(TokenType::Eol))
             {
-                isH = true;
-                break;
+                if(!getTokenWithSpace())
+                    break;
+                continue;
             }
             if(checkDeclareVarStat() == ValueType::Nan)
                 if(!checkAssignStat(true))
+                    if(!checkExpressionStat(true, ValueType::Void))
+                        if(!checkIf())
+                            if(!checkFor())
+                                if(!checkDo())
+                                    if(!checkWhile())
+                                        if(checkReturn(funcValue))
+                                            isReturned = true;
+                                        else if(!checkEmptyLine())
+                                            {
+                                                errors->append(Error(3,"statement", currentToken->getLine(), currentToken->getColumn()));
+                                                while(!currentToken->checkType(TokenType::Eol))
+                                                getTokenWithSpace();
+                                            }
+
+        }
+        if(currentIndex == tokens->size() -1)
+            errors->append(Error(0,"\"}\"", currentToken->getLine(), currentToken->getColumn()));
+        else
+        {
+            getTokenWithSpace();
+            checkEol(false);
+        }
+
+        return true;
+    }
+    return false;
+}
+
+bool Parser::checkBlockStat()
+{
+    if(currentToken->checkName("{") && getTokenWithSpace())
+    {
+        bool hasStat = false;
+        while(!currentToken->checkName("}"))
+        {
+            if(currentToken->checkType(TokenType::Eol))
+            {
+                if(!getTokenWithSpace())
+                    break;
+                continue;
+            }
+            if(checkDeclareVarStat() != ValueType::Nan)
+                hasStat = true;
+                else if(checkAssignStat(true))
+                hasStat = true;
+                    else if(checkExpressionStat(true, ValueType::Void))
+                    hasStat = true;
+                        else if(checkIf())
+                        hasStat = true;
+                            else if(checkFor())
+                            hasStat = true;
+                                else if(checkDo())
+                                hasStat = true;
+                                    else if(checkWhile())
+                                    hasStat = true;
+                                        else if(checkReturn(funcValue))
+                                        hasStat = true;
+                                            else if(checkEmptyLine())
+                                            hasStat = true;
+                                                else
+                                                {
+                                                    errors->append(Error(3,"statement", currentToken->getLine(), currentToken->getColumn()));
+                                                    while(!currentToken->checkType(TokenType::Eol))
+                                                    getTokenWithSpace();
+                                                }
+
+        }
+        if(!hasStat)
+            errors->append(Error(0,"statement in block", currentToken->getLine(), currentToken->getColumn()));
+        if(currentIndex == tokens->size() -1)
+            errors->append(Error(0,"\"}\"", currentToken->getLine(), currentToken->getColumn()));
+        else
+        {
+            getTokenWithSpace();
+            checkEol(false);
+        }
+
+        return true;
+    }
+    else if(currentIndex<tokens->size()-1)
+    {
+        if(checkDeclareVarStat() == ValueType::Nan)
+            if(!checkAssignStat(true))
+                if(!checkExpressionStat(true, ValueType::Void))
                     if(!checkIf())
                         if(!checkFor())
                             if(!checkDo())
                                 if(!checkWhile())
-                                    if(!checkReturn(funcValue))
-                                        if(!checkEmptyLine())
-                                        {
-                                            errors->append(Error(3,"statement", currentToken->getLine(), currentToken->getColumn()));
-                                            while(!currentToken->checkType(TokenType::Eol))
-                                            getTokenWithSpace();
-                                        }
-
-        }
-        if(!isH)
-            errors->append(Error(0,"\"}\"", currentToken->getLine(), currentToken->getColumn()));
-    }
-    else if(!isFunc)
-    {
-        if(checkDeclareVarStat() == ValueType::Nan)
-            if(!checkAssignStat(true))
-                if(!checkIf())
-                    if(!checkFor())
-                        if(!checkDo())
-                            if(!checkWhile())
-                                if(!checkEmptyLine())
-                                    if(!checkReturn(funcValue))
-                                        return false;
+                                    if(!checkEmptyLine())
+                                        if(!checkReturn(funcValue))
+                                            return false;
         return true;
     }
-    return false;
+    else
+        return false;
 }
 
 bool Parser::getTokenWithSpace()
 {
     if(currentIndex < tokens->size() - 1)
     {
-
         currentIndex++;
         currentToken = &(*tokens)[currentIndex];
         if(currentToken->checkType(TokenType::Space) && currentIndex < tokens->size() - 1)

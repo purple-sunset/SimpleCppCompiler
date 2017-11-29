@@ -104,6 +104,8 @@
        <string>#include&lt;a&gt;
 int main()
 {
+    int a=3;
+    return a;
 }
 </string>
       </property>

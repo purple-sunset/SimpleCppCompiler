@@ -22,6 +22,7 @@ private:
     QStack<QString> *stack;
     bool isInFunction;
     ValueType funcValue;
+    bool isReturned;
 
 public:
     Parser();
@@ -31,18 +32,20 @@ public:
     void check();
     bool checkEmptyLine();
     bool checkInclude();
-    bool checkEol();
+    bool checkEol(bool b);
     bool checkDeclareFuncStat();
     ValueType checkDeclareVarStat();
     bool checkAssignStat(bool b);
     bool checkExpression(ValueType v);
+    bool checkExpressionStat(bool b, ValueType v);
     bool checkIf();
     bool checkElse();
     bool checkFor();
     bool checkWhile();
     bool checkDo();
     bool checkReturn(ValueType v);
-    bool checkBlockStat(bool isFunc);
+    bool checkFuncBlock();
+    bool checkBlockStat();
 
     bool getTokenWithSpace();
     bool getTokenWithoutSpace();

@@ -1,6 +1,6 @@
 #include "error.h"
 
-const QStringList Error::errors({"Missing ", "Extra token ", "Wrong header ", "Invalid ", "Cannot assign to a const ", " is not declared" , " is not a boolean", " is not an integer", " is not a float", " is not a double"});
+const QStringList Error::errors({"Missing ", "Extra token ", "Wrong header ", "Invalid ", "Cannot assign to a constant ", " is not declared" , "is declared", " is not a boolean", " is not an integer", " is not a float", " is not a double"});
 
 qint32 Error::getLine() const
 {
