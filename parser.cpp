@@ -303,7 +303,7 @@ bool Parser::checkEol(bool b)
         bool hasE = false;
         while(!currentToken->checkType(TokenType::Eol))
         {
-            if(currentToken->checkName(";"))
+            if(currentToken->checkName(";") && !hasE)
             {
                 hasE = true;
                 getToken();
@@ -339,6 +339,7 @@ bool Parser::checkDeclareFuncStat()
     if(currentToken->checkType(TokenType::Keyword) && !currentToken->checkValue(ValueType::Nan))
     {
         ValueType v = currentToken->getValue();
+        funcValue = v;
 
         getToken();
         if(currentToken->checkType(TokenType::Variable))
@@ -346,7 +347,7 @@ bool Parser::checkDeclareFuncStat()
             getToken();
             declaredFunctions->append(DeclaredFunction(currentToken->getName(), v));
             isInFunction = true;
-            funcValue = v;
+
         }
 
         else
@@ -359,7 +360,24 @@ bool Parser::checkDeclareFuncStat()
 
         if(currentToken->checkType(TokenType::Keyword) && !currentToken->checkValue(ValueType::Nan))
         {
-            ValueType v = currentToken->getValue();
+            ValueType v1 = currentToken->getValue();
+            getToken();
+            if(currentToken->checkType(TokenType::Variable))
+            {
+                checkVariable(currentToken);
+                if(!currentToken->checkValue(ValueType::Void) && currentToken->checkValue(v))
+                    errors->append(Error(6, currentToken->getName(), currentToken->getLine(), currentToken->getColumn()));
+                else
+                {
+                    declaredVariables->append(DeclaredVariable(currentToken->getName(), v1, true));
+                    checkVariable(currentToken);
+                }
+            }
+        }
+
+
+        while (!currentToken->checkName(")") && currentToken->checkName(",") && !currentToken->checkType(TokenType::Eol))
+        {
             getToken();
             if(currentToken->checkType(TokenType::Variable))
             {
@@ -371,32 +389,15 @@ bool Parser::checkDeclareFuncStat()
                     declaredVariables->append(DeclaredVariable(currentToken->getName(), v, true));
                     checkVariable(currentToken);
                 }
-
-
-                while (getToken() && (currentToken->checkName(",")))
-                {
-                    getToken();
-                    if(currentToken->checkType(TokenType::Variable))
-                    {
-                        checkVariable(currentToken);
-                        if(!currentToken->checkValue(ValueType::Void) && currentToken->checkValue(v))
-                                errors->append(Error(6, currentToken->getName(), currentToken->getLine(), currentToken->getColumn()));
-                        else
-                        {
-                            declaredVariables->append(DeclaredVariable(currentToken->getName(), v, true));
-                            checkVariable(currentToken);
-                        }
-                    }
-                    else
-                        break;
-                }
             }
+            else
+                break;
         }
-        else if(currentToken->checkName(")"))
+
+        if(currentToken->checkName(")"))
             getToken();
         else
             errors->append(Error(0, "\")\"", currentToken->getLine(), currentToken->getColumn()));
-
         checkEol(false);
         return true;
     }
@@ -774,51 +775,18 @@ bool Parser::checkIf()
         currentToken = &(*tokens)[currentIndex];
 
         if(currentToken->checkName("("))
-        {
             getToken();
-            if(!checkExpression(ValueType::Boolean))
-                errors->append(Error(3,"condition", currentToken->getLine(), currentToken->getColumn()));
-            if(!currentToken->checkName(")"))
-                errors->append(Error(0, ")",currentToken->getLine(), currentToken->getColumn()));
-            getToken();
-        }
-
-        else if(currentToken->checkType(TokenType::Variable) || currentToken->checkType(TokenType::Literal))
-        {
-            qint32 i2 = currentIndex;
-            getToken();
-            if(checkEmptyLine())
-            {
-                currentIndex = i2;
-                currentToken = &(*tokens)[currentIndex];
-                if(currentToken->checkValue(ValueType::Boolean))
-                {
-                    getToken();
-                    checkEol(false);
-                }
-                else
-                    errors->append(Error(7, currentToken->getName(), currentToken->getLine(), currentToken->getColumn()));
-            }
-            else
-            {
-                currentIndex = i2;
-                currentToken = &(*tokens)[currentIndex];
-                errors->append(Error(0, "\"(\"", currentToken->getLine(), currentToken->getColumn()));
-                if(!checkExpression(ValueType::Boolean))
-                    errors->append(Error(3,"condition", currentToken->getLine(), currentToken->getColumn()));
-            }
-
-        }
-
         else
-        {
             errors->append(Error(0, "\"(\"", currentToken->getLine(), currentToken->getColumn()));
-            getToken();
-            if(!checkExpression(ValueType::Boolean))
-                errors->append(Error(3,"condition", currentToken->getLine(), currentToken->getColumn()));
 
-        }
 
+
+        if(!checkExpression(ValueType::Boolean))
+            errors->append(Error(3,"condition", currentToken->getLine(), currentToken->getColumn()));
+
+        if(!currentToken->checkName(")"))
+            errors->append(Error(0, ")",currentToken->getLine(), currentToken->getColumn()));
+        getToken();
 
         checkEol(false);
         while(checkEmptyLine())
@@ -1004,51 +972,18 @@ bool Parser::checkWhile()
         currentToken = &(*tokens)[currentIndex];
 
         if(currentToken->checkName("("))
-        {
             getToken();
-            if(!checkExpression(ValueType::Boolean))
-                errors->append(Error(3,"condition", currentToken->getLine(), currentToken->getColumn()));
-            if(!currentToken->checkName(")"))
-                errors->append(Error(0, ")",currentToken->getLine(), currentToken->getColumn()));
-            getToken();
-        }
-
-        else if(currentToken->checkType(TokenType::Variable) || currentToken->checkType(TokenType::Literal))
-        {
-            qint32 i2 = currentIndex;
-            getToken();
-            if(checkEmptyLine())
-            {
-                currentIndex = i2;
-                currentToken = &(*tokens)[currentIndex];
-                if(currentToken->checkValue(ValueType::Boolean))
-                {
-                    getToken();
-                    checkEol(false);
-                }
-                else
-                    errors->append(Error(7, currentToken->getName(), currentToken->getLine(), currentToken->getColumn()));
-            }
-            else
-            {
-                currentIndex = i2;
-                currentToken = &(*tokens)[currentIndex];
-                errors->append(Error(0, "\"(\"", currentToken->getLine(), currentToken->getColumn()));
-                if(!checkExpression(ValueType::Boolean))
-                    errors->append(Error(3,"condition", currentToken->getLine(), currentToken->getColumn()));
-            }
-
-        }
-
         else
-        {
             errors->append(Error(0, "\"(\"", currentToken->getLine(), currentToken->getColumn()));
-            getToken();
-            if(!checkExpression(ValueType::Boolean))
-                errors->append(Error(3,"condition", currentToken->getLine(), currentToken->getColumn()));
 
-        }
 
+
+        if(!checkExpression(ValueType::Boolean))
+            errors->append(Error(3,"condition", currentToken->getLine(), currentToken->getColumn()));
+
+        if(!currentToken->checkName(")"))
+            errors->append(Error(0, ")",currentToken->getLine(), currentToken->getColumn()));
+        getToken();
 
         checkEol(false);
         while(checkEmptyLine())
@@ -1100,50 +1035,18 @@ bool Parser::checkDo()
             currentToken = &(*tokens)[currentIndex];
 
             if(currentToken->checkName("("))
-            {
                 getToken();
-                if(!checkExpression(ValueType::Boolean))
-                    errors->append(Error(3,"condition", currentToken->getLine(), currentToken->getColumn()));
-                if(!currentToken->checkName(")"))
-                    errors->append(Error(0, ")",currentToken->getLine(), currentToken->getColumn()));
-                getToken();
-            }
-
-            else if(currentToken->checkType(TokenType::Variable) || currentToken->checkType(TokenType::Literal))
-            {
-                qint32 i2 = currentIndex;
-                getToken();
-                if(checkEmptyLine())
-                {
-                    currentIndex = i2;
-                    currentToken = &(*tokens)[currentIndex];
-                    if(currentToken->checkValue(ValueType::Boolean))
-                    {
-                        getToken();
-                        checkEol(false);
-                    }
-                    else
-                        errors->append(Error(7, currentToken->getName(), currentToken->getLine(), currentToken->getColumn()));
-                }
-                else
-                {
-                    currentIndex = i2;
-                    currentToken = &(*tokens)[currentIndex];
-                    errors->append(Error(0, "\"(\"", currentToken->getLine(), currentToken->getColumn()));
-                    if(!checkExpression(ValueType::Boolean))
-                        errors->append(Error(3,"condition", currentToken->getLine(), currentToken->getColumn()));
-                }
-
-            }
-
             else
-            {
                 errors->append(Error(0, "\"(\"", currentToken->getLine(), currentToken->getColumn()));
-                getToken();
-                if(!checkExpression(ValueType::Boolean))
-                    errors->append(Error(3,"condition", currentToken->getLine(), currentToken->getColumn()));
 
-            }
+
+
+            if(!checkExpression(ValueType::Boolean))
+                errors->append(Error(3,"condition", currentToken->getLine(), currentToken->getColumn()));
+
+            if(!currentToken->checkName(")"))
+                errors->append(Error(0, ")",currentToken->getLine(), currentToken->getColumn()));
+
 
             //getToken();
             checkEol(true);
@@ -1180,43 +1083,50 @@ bool Parser::checkReturn(ValueType v)
 
 bool Parser::checkFuncBlock()
 {
-    if(currentToken->checkName("{") && getToken())
+    if(!currentToken->checkName("{"))
     {
-        while(!currentToken->checkName("}"))
-        {
-            if(currentToken->checkType(TokenType::Eol))
-            {
-                if(!getToken())
-                    break;
-                continue;
-            }
-            if(!checkDeclareVarStat(true))
-                if(!checkAssignStat(true))
-                    if(!checkExpressionStat(true, ValueType::Void))
-                        if(!checkIf())
-                            if(!checkFor())
-                                if(!checkDo())
-                                    if(!checkWhile())
-                                        if(checkReturn(funcValue))
-                                            isReturned = true;
-                                        else if(!checkEmptyLine())
-                                            {
-                                                errors->append(Error(3,"statement", currentToken->getLine(), currentToken->getColumn()));
-                                                while(!currentToken->checkType(TokenType::Eol))
-                                                getToken();
-                                            }
-
-        }
-        if(currentIndex == tokens->size() -1)
-            errors->append(Error(0,"\"}\"", currentToken->getLine(), currentToken->getColumn()));
-        else
-        {
-            getToken();
-            checkEol(false);
-        }
-
-        return true;
+        errors->append(Error(0,"\"{\"", currentToken->getLine(), currentToken->getColumn()));
+        checkEol(false);
     }
+    else
+        getToken();
+
+
+    while(!currentToken->checkName("}"))
+    {
+        if(currentToken->checkType(TokenType::Eol))
+        {
+            if(!getToken())
+                break;
+            continue;
+        }
+        if(!checkDeclareVarStat(true))
+            if(!checkAssignStat(true))
+                if(!checkExpressionStat(true, ValueType::Void))
+                    if(!checkIf())
+                        if(!checkFor())
+                            if(!checkDo())
+                                if(!checkWhile())
+                                    if(checkReturn(funcValue))
+                                        isReturned = true;
+                                    else if(!checkEmptyLine())
+                                        {
+                                            errors->append(Error(3,"statement", currentToken->getLine(), currentToken->getColumn()));
+                                            while(!currentToken->checkType(TokenType::Eol))
+                                            getToken();
+                                        }
+
+    }
+    if(currentIndex == tokens->size() -1)
+        errors->append(Error(0,"\"}\"", currentToken->getLine(), currentToken->getColumn()));
+    else
+    {
+        getToken();
+        checkEol(false);
+    }
+
+    return true;
+
     return false;
 }
 
