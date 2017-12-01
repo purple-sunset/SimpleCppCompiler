@@ -34,7 +34,8 @@ SOURCES += \
     token.cpp \
     parser.cpp \
     declaredfunction.cpp \
-    enummath.cpp
+    enummath.cpp \
+    binarytreenode.cpp
 
 HEADERS += \
         mainwindow.h \
@@ -46,7 +47,10 @@ HEADERS += \
     token.h \
     parser.h \
     declaredfunction.h \
-    enummath.h
+    enummath.h \
+    binarytreenode.h
 
 FORMS += \
         mainwindow.ui
+
+DISTFILES +=

@@ -9,6 +9,7 @@
 #include "declaredfunction.h"
 #include "error.h"
 #include "enummath.h"
+#include "binarytreenode.h"
 
 class Parser
 {
@@ -19,7 +20,7 @@ private:
     QList<Error> *errors;
     qint32 currentIndex;
     Token *currentToken;
-    QStack<QString> *stack;
+    bool isOk;
     bool isInFunction;
     ValueType funcValue;
     bool isReturned;
@@ -34,9 +35,10 @@ public:
     bool checkInclude();
     bool checkEol(bool b);
     bool checkDeclareFuncStat();
-    ValueType checkDeclareVarStat();
+    bool checkDeclareVarStat(bool isCheck);
     bool checkAssignStat(bool b);
     bool checkExpression(ValueType v);
+    bool checkExpression2(ValueType v);
     bool checkExpressionStat(bool b, ValueType v);
     bool checkIf();
     bool checkElse();
@@ -47,9 +49,7 @@ public:
     bool checkFuncBlock();
     bool checkBlockStat();
 
-    bool getTokenWithSpace();
-    bool getTokenWithoutSpace();
-    bool checkSpace();
+    bool getToken();
     bool checkVariable(Token *t);
 
     QList<Token> *getTokens() const;

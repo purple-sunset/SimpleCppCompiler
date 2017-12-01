@@ -2,7 +2,7 @@
 
 const QStringList Token::keyWords({"include", "return", "using", "namespace", "case", "switch", "if", "else", "for", "while", "do", "char", "bool", "int", "void", "float", "double", "true", "false"});
 const QStringList Token::symbols({"#", "+", "-", "*", "/", "%", "<", ">", "=", "!", "&", "|", "(", ")", "{", "}",  "[", "]", "\"", "?", ".", ",", ":", ";"});
-const QStringList Token::tokenType({"Space", "Keyword", "Symbol", "Literal", "Variable", "Eol"});
+const QStringList Token::tokenType({"Keyword", "Symbol", "Literal", "Variable", "Eol"});
 const QStringList Token::valueType({"Nan", "Void", "Boolean", "Interger", "Float", "Double"});
 
 
@@ -66,9 +66,26 @@ bool Token::CheckSymbol(QChar c)
     return symbols.contains(QString(c));
 }
 
+qint32 Token::GetPriority(QString s)
+{
+    if(s=="!" || s=="||" || s=="&&")
+        return 1;
+    else if(s=="<" || s==">" || s=="<=" || s==">=" || s=="==" || s=="!=")
+        return 2;
+    else if(s=="+" || s=="-" )
+        return 3;
+    else if(s=="%" || s=="*" || s=="/")
+        return 4;
+    else if( s=="++" || s=="--")
+        return 5;
+    else if(s=="(" || s==")")
+        return 0;
+    else
+        return 0;
+}
+
 Token::Token()
 {
-
 }
 
 QString Token::Print()
@@ -106,14 +123,6 @@ bool Token::checkType(TokenType t)
 bool Token::checkValue(ValueType v)
 {
     return value == v;
-}
-
-
-void Token::createSpace(QString n)
-{
-    name = n;
-    type = TokenType::Space;
-    value = ValueType::Nan;
 }
 
 void Token::createKeyWord(QString n)
@@ -173,9 +182,9 @@ void Token::createSymbol(QString n)
 {
     name = n;
     type = TokenType::Symbol;
-    if(name=="!" || name=="||" || name=="&&" || name=="<" || name==">" || name=="=" || name=="<=" || name==">=" || name=="==" || name=="!=")
+    if(name=="!" || name=="||" || name=="&&" || name=="<" || name==">" || name=="<=" || name==">=" || name=="==" || name=="!=")
         value = ValueType::Boolean;
-    else if(name=="%" || name=="%=" || name=="++" || name=="--" || name=="+" || name=="-" || name=="*" || name=="/" || name=="+=" || name=="-=" || name=="*=" || name=="/=")
+    else if(name=="+" || name=="-" || name=="++" || name=="--" || name=="%" || name=="*" || name=="/")
         value = ValueType::Interger;
     else if(name=="(" || name==")")
         value = ValueType::Void;

@@ -27,9 +27,9 @@ public:
     static bool CheckSymbol(QChar c);
 
 public:
+    static qint32 GetPriority(QString s);
     Token();
     QString Print();
-    void createSpace(QString n);
     void createKeyWord(QString n);
     void createVariable(QString n);
     void createLiteral(QString n);

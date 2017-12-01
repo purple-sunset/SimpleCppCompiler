@@ -4,7 +4,6 @@
 
 enum class TokenType
 {
-    Space,
     Keyword,
     Symbol,
     Literal,

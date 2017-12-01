@@ -56,7 +56,7 @@ void MainWindow::on_btnParse_clicked()
     if(p->getErrors()->size() == 0)
     {
         ui->resultList->addItem("No error");
-        //return;
+        return;
     }
 
     for(int i=0; i<p->getErrors()->size(); i++)
@@ -64,7 +64,6 @@ void MainWindow::on_btnParse_clicked()
         Error e = p->getErrors()->at(i);
         ui->resultList->addItem(e.Print());
     }
-
 }
 
 

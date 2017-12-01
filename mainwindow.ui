@@ -104,7 +104,9 @@
        <string>#include&lt;a&gt;
 int main()
 {
-    int a=3;
+    int a;
+    while(a&lt;3)
+      a=3;
     return a;
 }
 </string>
